@@ -16,8 +16,9 @@
             padding: 0 4px;
             outline: none;
             transition: all 0.2s;
-            min-width: 60px;
+            min-width: 80px;
             display: inline-block;
+            border-radius: 4px;
         }
         .gap-input:focus { border-color: #ecc94b; background: #334155; }
         .fade-in { animation: fadeIn 0.5s ease-out; }
@@ -27,7 +28,6 @@
 <body class="min-h-screen text-slate-800">
 
     <div id="app" class="max-w-4xl mx-auto p-4 md:p-8">
-        <!-- Header -->
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-indigo-700">Java OOP Master</h1>
@@ -68,33 +68,43 @@
             <!-- Exercise View -->
             <div id="exercise-view" class="hidden space-y-6 fade-in">
                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h3 id="topic-tag" class="text-xs font-bold uppercase tracking-widest text-indigo-500 mb-2">TEMA</h3>
-                    <p id="exercise-context" class="text-lg text-slate-700 leading-relaxed"></p>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 id="topic-tag" class="text-xs font-bold uppercase tracking-widest text-indigo-500 mb-2">TEMA</h3>
+                            <p id="exercise-context" class="text-lg text-slate-700 leading-relaxed font-medium"></p>
+                        </div>
+                        <button onclick="fetchNewExercise()" title="Cambiar ejercicio" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="relative bg-slate-900 rounded-3xl p-6 shadow-2xl overflow-x-auto">
-                    <div class="absolute top-4 right-6 text-slate-500 text-xs font-mono uppercase">Java Code</div>
+                <div class="relative bg-slate-900 rounded-3xl p-6 shadow-2xl overflow-x-auto border-4 border-slate-800">
+                    <div class="absolute top-4 right-6 text-slate-500 text-xs font-mono uppercase">Java Editor</div>
                     <pre id="code-block" class="code-font text-slate-300 leading-loose"></pre>
                 </div>
 
-                <div class="flex justify-between items-center pt-4">
-                    <div id="feedback-message" class="text-sm font-medium"></div>
-                    <div class="space-x-4">
-                        <button onclick="checkAnswers()" id="check-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-md transition-all">
+                <div id="feedback-area" class="flex flex-col md:flex-row justify-between items-center gap-4 pt-4">
+                    <div id="feedback-message" class="text-sm font-bold min-h-[1.5rem]"></div>
+                    <div class="flex gap-4">
+                        <button onclick="checkAnswers()" id="check-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-md transition-all active:scale-95">
                             Verificar Solución
                         </button>
-                        <button onclick="fetchNewExercise()" id="next-btn" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-2xl font-semibold transition-all">
-                            Siguiente Ejercicio
+                        <button onclick="fetchNewExercise()" id="next-btn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-bold shadow-md transition-all animate-bounce">
+                            ¡Siguiente Reto!
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div id="explanation-view" class="hidden bg-amber-50 border border-amber-200 p-6 rounded-3xl fade-in">
+            <!-- Explanation View -->
+            <div id="explanation-view" class="hidden bg-amber-50 border-2 border-amber-200 p-6 rounded-3xl fade-in shadow-sm">
                 <div class="flex gap-4">
-                    <div class="text-2xl">💡</div>
+                    <div class="text-3xl">👨‍🏫</div>
                     <div>
-                        <h4 class="font-bold text-amber-800 mb-1">Explicación del Profe:</h4>
+                        <h4 class="font-bold text-amber-800 mb-1">Nota del Profesor:</h4>
                         <div id="explanation-text" class="text-amber-900 text-sm leading-relaxed"></div>
                     </div>
                 </div>
@@ -103,70 +113,68 @@
     </div>
 
     <script>
+        // CONFIGURACIÓN DE API
+        const API_KEY = "AIzaSyCbKDH1zHzrCdi7jKiiZo0CB4Bp7PLaoRo"; // API Key proporcionada por el usuario
+        
         let currentDifficulty = "Principiante";
         let score = 0;
         let currentExercise = null;
-        const apiKey = ""; // API Key automatizada por el sistema Canvas
 
-        
         async function callGemini(prompt, isJson = true) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
+            
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: isJson ? "application/json" : "text/plain"
-                }
+                generationConfig: isJson ? {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            topic: { type: "STRING" },
+                            context: { type: "STRING" },
+                            code: { type: "STRING" },
+                            answers: { type: "ARRAY", items: { type: "STRING" } }
+                        },
+                        required: ["topic", "context", "code", "answers"]
+                    }
+                } : {}
             };
 
-            // Implementación de reintentos con backoff exponencial
-            let delay = 1000;
-            for (let i = 0; i < 3; i++) {
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
-                } catch (e) {
-                    if (i === 2) throw e;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
-                }
-            }
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Error en la respuesta de la API");
+            
+            const result = await response.json();
+            const text = result.candidates[0].content.parts[0].text;
+            return isJson ? JSON.parse(text) : text;
         }
 
         async function fetchNewExercise() {
             toggleUI('loading');
             hideExplanation();
             
-            const prompt = `Actúa como un profesor experto en Java para alumnos de 1º DAW (Formación Profesional). 
-            Genera un ejercicio interactivo de Programación Orientada a Objetos en Java para el nivel: ${currentDifficulty}.
-            El ejercicio debe ser un código de Java con huecos marcados como {{GAP}}.
+            const prompt = `Actúa como un profesor de Programación en Java para alumnos de 1º DAW. 
+            Crea un ejercicio práctico de POO nivel: ${currentDifficulty}. 
+            El ejercicio debe tener entre 1 y 3 huecos marcados como {{GAP}}.
             
-            Devuelve un JSON con este esquema:
-            {
-                "topic": "Un nombre corto del tema (ej: Constructores)",
-                "context": "Una instrucción clara de qué debe hacer el alumno en este ejercicio.",
-                "code": "El código Java con marcadores {{GAP}} donde el alumno debe escribir.",
-                "answers": ["array con las palabras exactas que van en cada {{GAP}} en orden"],
-                "hint": "Una pequeña pista por si se atasca."
-            }
+            Niveles guía:
+            - Principiante: Declaración de clases, atributos private/public y tipos de datos básicos.
+            - Intermedio: Constructores, palabra clave 'this', getters y setters.
+            - Avanzado: Herencia (extends), palabra clave 'super' y sobrescritura (@Override).
             
-            Reglas: 
-            - Si es Principiante: clases simples, atributos, modificadores de acceso.
-            - Si es Intermedio: constructores (default y con parámetros), métodos getter/setter, uso de 'this'.
-            - Si es Avanzado: herencia (extends), sobrescritura de métodos (@Override), palabra clave 'super', polimorfismo básico.`;
+            Asegúrate de que el código sea correcto sintácticamente en Java.`;
 
             try {
-                const responseText = await callGemini(prompt);
-                currentExercise = JSON.parse(responseText);
+                currentExercise = await callGemini(prompt, true);
                 renderExercise();
                 toggleUI('exercise');
             } catch (error) {
                 console.error(error);
-                alert("Error al conectar con el servidor de ejercicios. Reintenta.");
+                alert("Error al conectar con la IA. Asegúrate de que la API Key sea válida.");
                 toggleUI('welcome');
             }
         }
@@ -181,10 +189,14 @@
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;");
             
-            // Reemplazar {{GAP}} por inputs interactivos
             let gapIndex = 0;
             codeHtml = codeHtml.replace(/{{GAP}}/g, () => {
-                const input = `<input type="text" class="gap-input" data-index="${gapIndex}" oninput="this.style.width = ((this.value.length + 1) * 8) + 'px'">`;
+                const input = `<input type="text" 
+                    class="gap-input font-bold" 
+                    data-index="${gapIndex}" 
+                    spellcheck="false"
+                    autocomplete="off"
+                    oninput="this.style.width = Math.max(80, (this.value.length + 1) * 10) + 'px'">`;
                 gapIndex++;
                 return input;
             });
@@ -195,7 +207,6 @@
             document.getElementById('next-btn').classList.add('hidden');
         }
 
-
         async function checkAnswers() {
             const inputs = document.querySelectorAll('.gap-input');
             let allCorrect = true;
@@ -204,43 +215,48 @@
             inputs.forEach((input, idx) => {
                 const val = input.value.trim();
                 userAnswers.push(val);
-                if (val === currentExercise.answers[idx]) {
-                    input.classList.add('text-emerald-400');
-                    input.classList.remove('text-rose-400');
+                
+                // Validación ignorando mayúsculas/minúsculas para palabras clave pero no para valores específicos si fuera necesario
+                if (val.toLowerCase() === currentExercise.answers[idx].toLowerCase()) {
+                    input.style.color = "#10b981"; // Emerald-500
+                    input.style.borderBottomColor = "#10b981";
                 } else {
                     allCorrect = false;
-                    input.classList.add('text-rose-400');
-                    input.classList.remove('text-emerald-400');
+                    input.style.color = "#ef4444"; // Red-500
+                    input.style.borderBottomColor = "#ef4444";
                 }
             });
 
             if (allCorrect) {
                 score += 10;
                 document.getElementById('score').innerText = score;
-                document.getElementById('feedback-message').innerHTML = `<span class="text-emerald-600 font-bold">¡Excelente! ¡Código compilado correctamente! +10 puntos</span>`;
+                document.getElementById('feedback-message').innerHTML = `<span class="text-emerald-600">✅ ¡Perfecto! El código compila correctamente.</span>`;
                 document.getElementById('check-btn').classList.add('hidden');
                 document.getElementById('next-btn').classList.remove('hidden');
             } else {
-                document.getElementById('feedback-message').innerHTML = `<span class="text-rose-600 font-bold">Hay errores en el código. Analizando...</span>`;
+                document.getElementById('feedback-message').innerHTML = `<span class="text-rose-600">❌ Revisa el código, hay algún error de sintaxis.</span>`;
                 explainError(userAnswers);
             }
         }
 
         async function explainError(userAnswers) {
-            const prompt = `Un alumno de 1º DAW ha fallado un ejercicio de Java OOP.
-            Ejercicio: ${currentExercise.code}
+            document.getElementById('explanation-text').innerText = "Pensando una explicación...";
+            document.getElementById('explanation-view').classList.remove('hidden');
+
+            const prompt = `Un alumno de Java (1º DAW) ha fallado este ejercicio:
+            Código: ${currentExercise.code}
             Sus respuestas: ${userAnswers.join(', ')}
             Respuestas correctas: ${currentExercise.answers.join(', ')}
-            Contexto: ${currentExercise.context}
             
-            Explícale de forma muy sencilla, amable y pedagógica por qué se ha equivocado. 
-            No le des solo la respuesta, explica el concepto detrás (ej: por qué se usa 'this', qué hace 'super', la diferencia entre 'private' y 'public', etc.). Máximo 3 líneas.`;
+            Explícale de forma muy breve (2 frases) y pedagógica por qué se ha equivocado, centrándote en el concepto teórico de POO involucrado. No le des la respuesta directamente de forma obvia, ayúdale a razonar.`;
 
-            const explanation = await callGemini(prompt, false);
-            document.getElementById('explanation-text').innerText = explanation;
-            document.getElementById('explanation-view').classList.remove('hidden');
+            try {
+                const explanation = await callGemini(prompt, false);
+                document.getElementById('explanation-text').innerText = explanation;
+            } catch (e) {
+                document.getElementById('explanation-text').innerText = "Parece que hubo un error al obtener la explicación, pero revisa bien las palabras clave de Java.";
+            }
         }
-
 
         function toggleUI(view) {
             document.getElementById('welcome-view').classList.add('hidden');
@@ -264,7 +280,7 @@
         }
 
         window.onload = () => {
-            console.log("Java OOP Master cargado.");
+            console.log("Java OOP Master Listo para DAW 1.");
         };
     </script>
 </body>
